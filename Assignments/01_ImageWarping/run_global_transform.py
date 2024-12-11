@@ -18,8 +18,27 @@ def apply_transform(image, scale, rotation, translation_x, translation_y, flip_h
     image = np.array(image_new)
     transformed_image = np.array(image)
 
-    ### FILL: Apply Composition Transform 
-    # Note: for scale and rotation, implement them around the center of the image （围绕图像中心进行放缩和旋转）
+    # Apply Composition Transform
+    center_x = image.shape[1] // 2
+    center_y = image.shape[0] // 2
+
+    # Scale
+    scale_matrix = np.array([[scale, 0, 0], [0, scale, 0], [0, 0, 1]])
+    scale_matrix = to_3x3(scale_matrix)
+    transformed_image = cv2.warpPerspective(transformed_image, scale_matrix, (transformed_image.shape[1], transformed_image.shape[0]))
+
+    # Rotation
+    rotation_matrix = cv2.getRotationMatrix2D((center_x, center_y), rotation, 1)
+    rotation_matrix = to_3x3(rotation_matrix)
+    transformed_image = cv2.warpPerspective(transformed_image, rotation_matrix, (transformed_image.shape[1], transformed_image.shape[0]))
+
+    # Translation
+    translation_matrix = np.array([[1, 0, translation_x], [0, 1, translation_y], [0, 0, 1]])
+    transformed_image = cv2.warpPerspective(transformed_image, translation_matrix, (transformed_image.shape[1], transformed_image.shape[0]))
+
+    # Flip Horizontal
+    if flip_horizontal:
+        transformed_image = cv2.flip(transformed_image, 1)
 
     return transformed_image
 
@@ -61,4 +80,4 @@ def interactive_transform():
     return demo
 
 # Launch the Gradio interface
-interactive_transform().launch()
+interactive_transform().launch(share=True)
