@@ -18,28 +18,42 @@ def apply_transform(image, scale, rotation, translation_x, translation_y, flip_h
     image = np.array(image_new)
     transformed_image = np.array(image)
 
-    # Apply Composition Transform
-    center_x = image.shape[1] // 2
-    center_y = image.shape[0] // 2
+    ### FILL: Apply Composition Transform 
+    # Note: for scale and rotation, implement them around the center of the image （围绕图像中心进行放缩和旋转）
+    # Get image dimensions
+    h, w = image.shape[:2]
+    center = (w // 2, h // 2)
 
-    # Scale
-    scale_matrix = np.array([[scale, 0, 0], [0, scale, 0], [0, 0, 1]])
-    scale_matrix = to_3x3(scale_matrix)
-    transformed_image = cv2.warpPerspective(transformed_image, scale_matrix, (transformed_image.shape[1], transformed_image.shape[0]))
+    # Create the transformation matrix
+    transform_matrix = np.eye(3)
 
-    # Rotation
-    rotation_matrix = cv2.getRotationMatrix2D((center_x, center_y), rotation, 1)
-    rotation_matrix = to_3x3(rotation_matrix)
-    transformed_image = cv2.warpPerspective(transformed_image, rotation_matrix, (transformed_image.shape[1], transformed_image.shape[0]))
+    # Apply scaling
+    scale_matrix = to_3x3(cv2.getRotationMatrix2D(center, 0, scale))
+    transform_matrix = np.dot(transform_matrix, scale_matrix)
 
-    # Translation
-    translation_matrix = np.array([[1, 0, translation_x], [0, 1, translation_y], [0, 0, 1]])
-    transformed_image = cv2.warpPerspective(transformed_image, translation_matrix, (transformed_image.shape[1], transformed_image.shape[0]))
+    # Apply rotation
+    rotation_matrix = to_3x3(cv2.getRotationMatrix2D(center, rotation, 1))
+    transform_matrix = np.dot(transform_matrix, rotation_matrix)
 
-    # Flip Horizontal
+    # Apply translation
+    translation_matrix = np.array([
+        [1, 0, translation_x],
+        [0, 1, translation_y],
+        [0, 0, 1]
+    ])
+    transform_matrix = np.dot(transform_matrix, translation_matrix)
+
+    # Apply horizontal flip if selected
     if flip_horizontal:
-        transformed_image = cv2.flip(transformed_image, 1)
+        flip_matrix = np.array([
+            [-1, 0, w],
+            [0, 1, 0],
+            [0, 0, 1]
+        ])
+        transform_matrix = np.dot(transform_matrix, flip_matrix)
 
+    # Apply the transformation
+    transformed_image = cv2.warpPerspective(image, transform_matrix, (w, h), borderValue=(255, 255, 255))
     return transformed_image
 
 # Gradio Interface

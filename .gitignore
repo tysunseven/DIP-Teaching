@@ -1,1 +1,8 @@
 model.py
+venv/
+datasets/
+train_results/
+val_results/
+checkpoints/
+train_list.txt
+val_list.txt
