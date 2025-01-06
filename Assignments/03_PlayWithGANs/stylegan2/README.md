@@ -1,0 +1,1 @@
+Download stylegan2-ffhq-config-f.pkl from https://github.com/NVlabs/stylegan2
