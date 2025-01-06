@@ -380,4 +380,4 @@ with gr.Blocks(title="Poisson Image Blending", css="""
     )
 
 # Launch the Gradio app
-demo.launch(share=True)
+demo.launch()
