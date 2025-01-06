@@ -48,10 +48,20 @@ class GaussianRenderer(nn.Module):
         J_proj = torch.zeros((N, 2, 3), device=means3D.device)
         ### FILL:
         ### J_proj = ...
+
+
+        # Compute Jacobian of perspective projection
+        J_proj[:, 0, 0] = K[0, 0] / depths
+        J_proj[:, 0, 2] = -K[0, 0] * cam_points[:, 0] / (depths ** 2)
+        J_proj[:, 1, 1] = K[1, 1] / depths
+        J_proj[:, 1, 2] = -K[1, 1] * cam_points[:, 1] / (depths ** 2)
         
         # Transform covariance to camera space
         ### FILL: Aplly world to camera rotation to the 3d covariance matrix
         ### covs_cam = ...  # (N, 3, 3)
+
+        # Transform covariance to camera space
+        covs_cam = torch.bmm(R.unsqueeze(0).expand(N, -1, -1), torch.bmm(covs3d, R.T.unsqueeze(0).expand(N, -1, -1)))
         
         # Project to 2D
         covs2D = torch.bmm(J_proj, torch.bmm(covs_cam, J_proj.permute(0, 2, 1)))  # (N, 2, 2)
@@ -66,6 +76,7 @@ class GaussianRenderer(nn.Module):
     ) -> torch.Tensor:           # (N, H, W)
         N = means2D.shape[0]
         H, W = pixels.shape[:2]
+
         
         # Compute offset from mean (N, H, W, 2)
         dx = pixels.unsqueeze(0) - means2D.reshape(N, 1, 1, 2)
@@ -77,6 +88,18 @@ class GaussianRenderer(nn.Module):
         # Compute determinant for normalization
         ### FILL: compute the gaussian values
         ### gaussian = ... ## (N, H, W)
+
+        # Compute inverse of covariance matrices
+        inv_covs2D = torch.inverse(covs2D)  # (N, 2, 2)
+        
+        # Compute exponent term
+        exponent = -0.5 * torch.einsum('nhwi,nij,nhwj->nhw', dx, inv_covs2D, dx)  # (N, H, W)
+        
+        # Compute normalization term
+        norm_term = 1.0 / (2.0 * np.pi * torch.sqrt(torch.det(covs2D)))  # (N,)
+        
+        # Compute Gaussian values
+        gaussian = norm_term.view(N, 1, 1) * torch.exp(exponent)  # (N, H, W)
     
         return gaussian
 
@@ -116,10 +139,18 @@ class GaussianRenderer(nn.Module):
         alphas = opacities.view(N, 1, 1) * gaussian_values  # (N, H, W)
         colors = colors.view(N, 3, 1, 1).expand(-1, -1, self.H, self.W)  # (N, 3, H, W)
         colors = colors.permute(0, 2, 3, 1)  # (N, H, W, 3)
+
+
         
         # 7. Compute weights
         ### FILL:
         ### weights = ... # (N, H, W)
+        # Compute weights using the given formula
+
+        # Compute weights using the given formula
+        alphas_cumprod = torch.cumprod(1.0 - alphas, dim=0)  # (N, H, W)
+        alphas_cumprod = torch.cat([torch.ones(1, self.H, self.W, device=alphas.device), alphas_cumprod[:-1]], dim=0)  # Shift by 1
+        weights = alphas * alphas_cumprod  # (N, H, W)
         
         # 8. Final rendering
         rendered = (weights.unsqueeze(-1) * colors).sum(dim=0)  # (H, W, 3)

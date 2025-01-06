@@ -10,7 +10,7 @@ if __name__ == '__main__':
     data_dir = args.data_dir
 
     # Feature extraction with shared intrinsics (assume it's the same camera)
-    subprocess.run(['colmap', 'feature_extractor', '--image_path', os.path.join(data_dir, 'images'), '--database_path', os.path.join(data_dir, 'database.db'), '--ImageReader.single_camera', '1', '--ImageReader.camera_model', 'PINHOLE', '--SiftExtraction.use_gpu', '1'])
+    subprocess.run(['D:\\WORK\\COLMAP-3.9.1-windows-cuda\\bin\\colmap', 'feature_extractor', '--image_path', os.path.join(data_dir, 'images'), '--database_path', os.path.join(data_dir, 'database.db'), '--ImageReader.single_camera', '1', '--ImageReader.camera_model', 'PINHOLE', '--SiftExtraction.use_gpu', '1'])
 
     # Feature matching
     subprocess.run(['colmap', 'exhaustive_matcher', '--database_path', os.path.join(data_dir, 'database.db'), '--SiftMatching.use_gpu', '1'])
