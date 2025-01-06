@@ -42,14 +42,76 @@ def record_points(evt: gr.SelectData):
 # 执行仿射变换
 
 def point_guided_deformation(image, source_pts, target_pts, alpha=1.0, eps=1e-8):
-    """ 
-    Return
-    ------
-        A deformed image.
-    """
+    # 基于MLS的图像变形（Affine Model）
+    # source_pts: 控制点原始位置   shape: (N, 2)
+    # target_pts: 控制点目标位置   shape: (N, 2)
+    # alpha: 控制距离权重衰减程度
+    # eps: 防止除零错误的一个小值
     
-    warped_image = np.array(image)
-    ### FILL: 基于MLS or RBF 实现 image warping
+    if len(source_pts) == 0 or len(source_pts) != len(target_pts):
+        # 若无控制点或数量不匹配，则返回原图
+        return image.copy()
+    
+    h, w = image.shape[:2]
+    warped_image = np.zeros_like(image, dtype=image.dtype)
+    
+    source_pts = source_pts.astype(np.float64)
+    target_pts = target_pts.astype(np.float64)
+    
+    for y in range(h):
+        for x in range(w):
+            X = np.array([x, y], dtype=np.float64)
+            
+            # 计算权重 w_i = 1 / ||X - p_i||^(2alpha)
+            # 若X与某个p_i非常接近，那么直接将X映射到对应的q_i，以减少数值不稳定性
+            distances = np.linalg.norm(source_pts - X, axis=1)
+            close_idx = np.where(distances < eps)[0]
+            if len(close_idx) > 0:
+                # 如果点X太接近某个控制点p_i，那就直接映射到对应的q_i
+                idx = close_idx[0]
+                Xp = target_pts[idx]
+                Xp_int = Xp.astype(np.int32)
+                if 0 <= Xp_int[0] < w and 0 <= Xp_int[1] < h:
+                    warped_image[y, x] = image[Xp_int[1], Xp_int[0]]
+                else:
+                    warped_image[y, x] = 0
+                continue
+            
+            weights = 1.0 / np.power(distances, 2 * alpha)
+            W = np.sum(weights)
+
+            # 计算加权重心
+            p_star = np.sum(source_pts * weights[:, None], axis=0) / W
+            q_star = np.sum(target_pts * weights[:, None], axis=0) / W
+
+            # 去中心化
+            p_prime = source_pts - p_star
+            q_prime = target_pts - q_star
+
+            # 计算A矩阵：A = (Σ w_i q_i' p_i'^T) (Σ w_i p_i' p_i'^T)^(-1)
+            # p_i'和q_i'为2D向量，因此p_prime, q_prime为(N,2)
+            p_weighted = p_prime * weights[:, None]  # (N,2)
+            # Σ w_i p_i' p_i'^T
+            M = p_weighted.T @ p_prime  # 2x2 矩阵
+            # Σ w_i q_i' p_i'^T
+            N = (q_prime * weights[:, None]).T @ p_prime  # 2x2 矩阵
+
+            # 当M不可逆时，退化为纯平移
+            if abs(np.linalg.det(M)) < eps:
+                A = np.eye(2)
+            else:
+                A = N @ np.linalg.inv(M)
+
+            # 对当前点X进行变换 X' = q_star + A (X - p_star)
+            X_prime = q_star + A @ (X - p_star)
+            Xp_int = X_prime.astype(np.int32)
+
+            # 最近邻取样
+            if 0 <= Xp_int[0] < w and 0 <= Xp_int[1] < h:
+                warped_image[y, x] = image[Xp_int[1], Xp_int[0]]
+            else:
+                # 超出范围的点填充为0或背景值
+                warped_image[y, x] = 0
 
     return warped_image
 
@@ -71,7 +133,7 @@ def clear_points():
 with gr.Blocks() as demo:
     with gr.Row():
         with gr.Column():
-            input_image = gr.Image(source="upload", label="上传图片", interactive=True, width=800, height=200)
+            input_image = gr.Image(sources="upload", label="上传图片", interactive=True, width=800, height=200)
             point_select = gr.Image(label="点击选择控制点和目标点", interactive=True, width=800, height=800)
             
         with gr.Column():
@@ -91,4 +153,4 @@ with gr.Blocks() as demo:
     clear_button.click(clear_points, None, point_select)
     
 # 启动 Gradio 应用
-demo.launch()
+demo.launch(share=True)
